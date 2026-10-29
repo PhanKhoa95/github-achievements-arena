@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏆 GitHub Achievements & Career Launchpad Studio</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #30363d;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --blue: #58a6ff;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 { color: #fff; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    label { display: block; font-weight: 600; margin-top: 12px; margin-bottom: 4px; font-size: 14px; }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #010409;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    pre {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏆 GitHub Achievements & Career Launchpad Studio</h1>
+    <p class="subtitle">Generate your 1-Click Arena Pull Request & Recruiter-Ready Profile README in seconds.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>1. Enter Your Developer Details</h3>
+        <label>GitHub Username</label>
+        <input id="username" placeholder="e.g. octocat" oninput="updateOutput()" />
+        <label>Display Name</label>
+        <input id="fullname" placeholder="e.g. Alex Rivera" oninput="updateOutput()" />
+        <label>Target Career Role</label>
+        <select id="role" onchange="updateOutput()">
+          <option>Full-Stack Software Engineer</option>
+          <option>Backend & Systems Engineer</option>
+          <option>Frontend & UI/UX Engineer</option>
+          <option>AI / Machine Learning Engineer</option>
+          <option>Rust / Web3 Infrastructure Engineer</option>
+          <option>DevOps & Cloud Engineer</option>
+        </select>
+        <label>Primary Tech Stack (comma-separated)</label>
+        <input id="stack" value="TypeScript, React, Python, Rust, Docker" oninput="updateOutput()" />
+        <a id="oneClickBtn" class="btn" target="_blank" href="https://github.com/khoap1220-hue/github-achievements-arena">🚀 Open 1-Click Auto-Merge PR on GitHub</a>
+      </div>
+      <div class="card">
+        <h3>2. Generated Profile README.md & Commit Trailer</h3>
+        <pre id="readmePreview"></pre>
+      </div>
+    </div>
+  </div>
+  <script>
+    function updateOutput() {
+      const u = document.getElementById('username').value.trim() || 'your-username';
+      const n = document.getElementById('fullname').value.trim() || u;
+      const r = document.getElementById('role').value;
+      const s = document.getElementById('stack').value;
+      const md = `# Hi there, I'm ${n} (@${u}) 👋\n\n🚀 **${r}** passionate about open-source and clean software architecture.\n\n### 🛠️ Core Tech Stack\n- **Technologies:** ${s}\n\n### 🏆 GitHub Achievements\n- 🦈 **Pull Shark** & 👯 **Pair Extraordinaire** via [github-achievements-arena](https://github.com/khoap1220-hue/github-achievements-arena)\n\n### 📝 Co-Authored Commit Trailer\nCo-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`;
+      document.getElementById('readmePreview').textContent = md;
+      const jsonVal = encodeURIComponent(JSON.stringify({
+        username: u,
+        name: n,
+        role: r,
+        primary_stack: s.split(',').map(x => x.trim()).filter(Boolean),
+        open_to_work: true,
+        target_badges: ["Pull Shark", "Pair Extraordinaire", "Quickdraw", "Galaxy Brain"],
+        arena_prs_count: 1,
+        updated_at: new Date().toISOString().slice(0, 10)
+      }, null, 2) + '\n');
+      const msg = encodeURIComponent(`feat(career): add @${u} to Developer Directory`);
+      const desc = encodeURIComponent(`Co-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`);
+      document.getElementById('oneClickBtn').href = `https://github.com/khoap1220-hue/github-achievements-arena/new/main?filename=contributors/${u}.json&value=${jsonVal}&message=${msg}&description=${desc}`;
+    }
+    updateOutput();
+  </script>
+</body>
+</html>

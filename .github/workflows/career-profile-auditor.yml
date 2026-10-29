@@ -1,0 +1,180 @@
+name: "🎓 Recruiter 100-Point GitHub Profile Auditor & README Generator Bot"
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  audit-developer-profile:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.title, '[Audit]') || contains(github.event.issue.title, '[Career]')
+    steps:
+      - name: Run 100-Point Recruiter Readiness Audit & Generate Custom Profile README
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue = context.payload.issue;
+            const issueNumber = issue.number;
+            const username = issue.user.login;
+
+            // 1. Fetch User Profile
+            const { data: user } = await github.rest.users.getByUsername({ username });
+
+            // 2. Fetch User Public Repos
+            const { data: repos } = await github.rest.repos.listForUser({
+              username,
+              sort: 'updated',
+              per_page: 30,
+            });
+
+            // 3. Check if special Profile README repository (<username>/<username>) exists
+            let hasProfileReadme = false;
+            try {
+              await github.rest.repos.getContent({
+                owner: username,
+                repo: username,
+                path: 'README.md',
+              });
+              hasProfileReadme = true;
+            } catch (e) {
+              hasProfileReadme = false;
+            }
+
+            // 4. Calculate 100-Point Recruiter Readiness Score
+            let score = 0;
+            const checks = [];
+
+            // A. Identity & Bio (25 pts)
+            if (user.name) {
+              score += 8;
+              checks.push(`| ✅ **Display Name** | \`${user.name}\` | **+8 / 8** | Clear professional identity |`);
+            } else {
+              checks.push(`| ❌ **Display Name** | *Missing* | **0 / 8** | Add your full name in [GitHub Profile Settings](https://github.com/settings/profile) |`);
+            }
+
+            if (user.bio && user.bio.trim().length >= 15) {
+              score += 10;
+              checks.push(`| ✅ **Professional Bio** | \`${user.bio.slice(0, 50)}...\` | **+10 / 10** | Recruiters immediately see your focus area |`);
+            } else {
+              checks.push(`| ⚠️ **Professional Bio** | *Missing or too short* | **0 / 10** | Add a 1-line bio (e.g. *"Full-Stack & Rust Engineer building open-source tools"*) |`);
+            }
+
+            if (user.blog || user.location || user.hireable) {
+              score += 7;
+              checks.push(`| ✅ **Contact / Location / Hireable** | Configured | **+7 / 7** | Helps hiring managers reach you |`);
+            } else {
+              checks.push(`| ⚠️ **Contact / Hireable Flag** | *Not set* | **0 / 7** | Check **"Available for hire"** and add a LinkedIn/Portfolio link in Settings |`);
+            }
+
+            // B. Special Profile README <username>/<username> (25 pts)
+            if (hasProfileReadme) {
+              score += 25;
+              checks.push(`| ✅ **Profile Landing Page (\`${username}/${username}\`)** | **Active** | **+25 / 25** | Standout landing page visible to recruiters! |`);
+            } else {
+              checks.push(`| ❌ **Profile Landing Page (\`${username}/${username}\`)** | *Not created yet* | **0 / 25** | Create a public repo named **\`${username}\`** with a \`README.md\` (template generated below!) |`);
+            }
+
+            // C. Repository Documentation & Hygiene (25 pts)
+            const nonForkRepos = repos.filter(r => !r.fork);
+            const documentedRepos = nonForkRepos.filter(r => r.description && r.description.trim().length > 10);
+            const repoPoints = Math.min(25, nonForkRepos.length >= 3 ? (documentedRepos.length >= 3 ? 25 : 15) : 10);
+            score += repoPoints;
+            checks.push(`| ${repoPoints >= 20 ? '✅' : '⚠️'} **Public Projects & Descriptions** | \`${documentedRepos.length}/${nonForkRepos.length}\` repos have descriptions | **+${repoPoints} / 25** | Always add a clear 1-sentence description & topics to every pinned repo |`);
+
+            // D. Open-Source Activity & Community Presence (25 pts)
+            const totalStars = nonForkRepos.reduce((acc, r) => acc + (r.stargazers_count || 0), 0);
+            const activityPoints = Math.min(25, 10 + (nonForkRepos.length >= 2 ? 8 : 0) + (totalStars >= 1 ? 7 : 3));
+            score += activityPoints;
+            checks.push(`| ✅ **Open-Source Footprint** | \`${user.public_repos}\` public repos, \`${totalStars}\` total ⭐ | **+${activityPoints} / 25** | Submit PRs in this Arena to unlock **🦈 Pull Shark** & **🧠 Galaxy Brain**! |`);
+
+            // Top languages detection
+            const langCounts = {};
+            for (const r of nonForkRepos) {
+              if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
+            }
+            const topLangs = Object.keys(langCounts).sort((a, b) => langCounts[b] - a).slice(0, 5);
+            const langDisplay = topLangs.length > 0 ? topLangs.join(', ') : 'TypeScript, Python, Rust, Go';
+
+            const tierLabel = score >= 85 ? '🏆 **Job-Ready Standout Profile (A+)**' : (score >= 65 ? '🚀 **Strong Junior Profile (B+)**' : '🌱 **Rising Developer — Quick Wins Available!**');
+
+            const generatedReadme = [
+              `# Hi there, I'm ${user.name || username} (\`@${username}\`) 👋`,
+              ``,
+              `🚀 **Software Developer** passionate about building clean, reliable software and contributing to open-source.`,
+              ``,
+              `### 🛠️ Core Tech Stack`,
+              `- **Languages & Tools:** ${langDisplay}`,
+              `- **Focus Areas:** Open-Source Development, Clean Architecture, Automated Testing`,
+              ``,
+              `### 🏆 GitHub Achievements & Open-Source Activity`,
+              `- 🦈 **Pull Shark** & 👯 **Pair Extraordinaire** Contributor in [\`github-achievements-arena\`](https://github.com/${owner}/${repo})`,
+              `- 🌱 Currently contributing to open-source and building production-ready projects.`,
+              ``,
+              `### 📫 Connect With Me`,
+              `- **GitHub:** [github.com/${username}](https://github.com/${username})`,
+              user.blog ? `- **Portfolio / Website:** ${user.blog}` : `- **LinkedIn / Portfolio:** *(Add your link here)*`
+            ].join('\n');
+
+            const sampleJson = encodeURIComponent(JSON.stringify({
+              username: username,
+              name: user.name || username,
+              role: "Software Developer",
+              primary_stack: topLangs.length > 0 ? topLangs : ["TypeScript", "Python"],
+              open_to_work: true,
+              target_badges: ["Pull Shark", "Pair Extraordinaire", "Quickdraw", "Galaxy Brain"],
+              arena_prs_count: 1,
+              updated_at: new Date().toISOString().slice(0, 10)
+            }, null, 2) + '\n');
+
+            const oneClickPrUrl = `https://github.com/${owner}/${repo}/new/main?filename=contributors/${username}.json&value=${sampleJson}&message=${encodeURIComponent(`feat(career): add @${username} to Developer Directory`)}&description=${encodeURIComponent(`Co-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`)}`;
+
+            const reportBody = [
+              `## 🎓 100-Point Recruiter & Career Readiness Audit for @${username}`,
+              ``,
+              `> **Overall Readiness Score:** **\`${score} / 100\`** — ${tierLabel}`,
+              `> **⚡ Bonus:** I am also closing this issue within 15 seconds so you automatically earn the **⚡ Quickdraw** badge!`,
+              ``,
+              `---`,
+              ``,
+              `### 📊 Detailed Profile Scorecard`,
+              ``,
+              `| Audit Dimension | Current Status | Score | Recruiter Tip / Action Item |`,
+              `| :--- | :--- | :---: | :--- |`,
+              ...checks,
+              ``,
+              `---`,
+              ``,
+              `### ✨ Ready-to-Use Profile \`README.md\` for \`${username}/${username}\``,
+              `Copy the Markdown block below into a public repository named **\`${username}/${username}\`** to create your instant recruiter landing page:`,
+              ``,
+              `\`\`\`markdown`,
+              generatedReadme,
+              `\`\`\``,
+              ``,
+              `---`,
+              ``,
+              `### 🚀 Next Step: Join the Career Directory & Unlock \`🦈 Pull Shark\` + \`👯 Pair Extraordinaire\``,
+              `1. Make sure you have clicked **\`⭐ Star\`** at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}).`,
+              `2. 👉 [**Click Here to Add Your Developer Card in 1 Click (Pre-Filled PR)**](${oneClickPrUrl}) — our **Arena Bot** will automatically approve and merge it in 10 seconds!`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: reportBody,
+            });
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              state: 'closed',
+              state_reason: 'completed',
+            });

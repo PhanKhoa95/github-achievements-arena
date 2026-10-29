@@ -54,6 +54,21 @@ python scripts/arena_cli.py --all --count 2
 
 ---
 
+---
+
+## 🎓 NEW: Junior Developer Career Launchpad & 100-Point Recruiter Profile Auditor Bot!
+
+Entering the tech job market or applying for open-source grants (`GSoC`, `LFX`, `Algora`, `Drips Stellar Wave`)?
+Our **`🎓 Recruiter 100-Point GitHub Profile Auditor Bot` (`career-profile-auditor.yml`)** inspects your live GitHub profile and generates a customized **Profile `README.md`** in **15 seconds**:
+
+1. **Click `⭐ Star`** at the top-right of this repository.
+2. 👉 **[Click Here to Run Your Free 100-Point GitHub Profile & Career Audit](https://github.com/khoap1220-hue/github-achievements-arena/issues/new?template=03-career-profile-audit.yml)** and click **Submit new issue**.
+3. Within **15 seconds**, the Bot will reply with:
+   - 📊 Your **100-Point Recruiter Readiness Scorecard** (Identity, Bio, `<username>/<username>` Landing Page, Repo Hygiene, Open-Source Footprint).
+   - ✨ A **Copy-Paste Profile `README.md`** tailored to your actual top programming languages!
+   - ⚡ Instant **Quickdraw Badge Unlock** (by closing the audit issue within 15 seconds) + a **1-Click Pre-Filled PR Link** to add your developer card to the Career Directory!
+4. 📖 Read the full **[New Developer Career Launchpad Playbook (`docs/CAREER_LAUNCHPAD_PLAYBOOK.md`)](./docs/CAREER_LAUNCHPAD_PLAYBOOK.md)** and try the interactive **[Web Studio (`web/index.html`)](./web/index.html)**!
+
 ## 📊 Complete GitHub Achievement Collection Matrix
 
 | Badge | Achievement Name | Tiers (`1x` / `x2` / `x3` / `x4`) | Automated Bot in This Arena | Time to Unlock |

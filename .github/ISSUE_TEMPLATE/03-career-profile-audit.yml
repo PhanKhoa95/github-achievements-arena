@@ -1,0 +1,29 @@
+name: "🎓 Free 100-Point GitHub Profile & Recruiter Audit (Instant Bot Report)"
+description: "Get an instant 100-point recruiter readiness audit of your GitHub profile + an auto-generated Profile README + ⚡ Quickdraw!"
+title: "[Audit] 🎓 Generate My 100-Point GitHub Career & Profile Scorecard"
+labels: ["career-audit", "quickdraw"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🎓 Instant GitHub Profile & Recruiter Readiness Audit
+        1. Click **⭐ Star** at the top-right of this repository.
+        2. Click **Submit new issue** below — within **15 seconds**, our **🎓 Career Auditor Bot** will:
+           - Scan your public GitHub profile, bio, repositories, and languages.
+           - Score your profile out of **100 points** based on real technical recruiter criteria.
+           - Generate a customized **Profile `README.md`** ready for your `<username>/<username>` repo.
+           - Close this issue under 15 seconds to unlock your **⚡ Quickdraw** badge!
+  - type: dropdown
+    id: target_role
+    attributes:
+      label: "What is your target engineering role?"
+      options:
+        - "Full-Stack Developer"
+        - "Backend / Systems Engineer"
+        - "Frontend / Mobile Developer"
+        - "AI / Machine Learning Engineer"
+        - "Web3 / Smart Contract Engineer"
+        - "DevOps / Cloud Engineer"
+        - "Student / First-Time Contributor"
+    validations:
+      required: true
