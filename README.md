@@ -69,6 +69,16 @@ Our **`🎓 Recruiter 100-Point GitHub Profile Auditor Bot` (`career-profile-aud
    - ⚡ Instant **Quickdraw Badge Unlock** (by closing the audit issue within 15 seconds) + a **1-Click Pre-Filled PR Link** to add your developer card to the Career Directory!
 4. 📖 Read the full **[New Developer Career Launchpad Playbook (`docs/CAREER_LAUNCHPAD_PLAYBOOK.md`)](./docs/CAREER_LAUNCHPAD_PLAYBOOK.md)** and try the interactive **[Web Studio (`web/index.html`)](./web/index.html)**!
 
+---
+
+## 📚 NEW: 25 Battle-Tested Open-Source & Code Review Lessons (`Moderated Global Knowledge Base`)
+
+Want to know why junior developers get their PRs rejected on real repositories — and the **19 senior code review patterns** (`Constant-Time Auth`, `Atomic File Writes`, `SSRF Guards`, `Checked Arithmetic`, `Zero-Unwrap Rust`) that get PRs approved on the first try?
+
+- 📖 **[Read the 25 Battle-Tested Open-Source & Code Review Lessons (`docs/REAL_WORLD_OSS_LESSONS.md`)](./docs/REAL_WORLD_OSS_LESSONS.md)**
+- 🧠 **[Contribute Your Own Engineering Lesson (`lessons/README.md`)](./lessons/README.md)** — Submit a PR adding `lessons/community/<your-username>-<topic>.json`! Our **🛡️ 5-Gate Moderation Bot** validates your JSON schema, ownership, and DLP safety, then **auto-merges valid lessons in 10 seconds**!
+- 🛡️ **[Read Our 2-Tier Moderation & Governance Policy (`CONTRIBUTING.md`)](./CONTRIBUTING.md)**
+
 ## 📊 Complete GitHub Achievement Collection Matrix
 
 | Badge | Achievement Name | Tiers (`1x` / `x2` / `x3` / `x4`) | Automated Bot in This Arena | Time to Unlock |

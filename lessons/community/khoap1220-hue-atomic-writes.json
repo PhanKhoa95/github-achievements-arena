@@ -1,0 +1,11 @@
+{
+  "id": "LESSON-khoap1220-hue-atomic-writes",
+  "author": "khoap1220-hue",
+  "title": "Use Atomic Tempfile + os.replace() Instead of Direct File Overwrites",
+  "category": "Concurrency & Reliability",
+  "language": "Python",
+  "problem": "Writing directly to state.json with write_text() can leave a truncated or 0-byte file if the process crashes or loses power mid-write.",
+  "solution": "Write the full payload to a temporary file in the same directory, flush to disk, and atomically swap it into place with os.replace().",
+  "code_example": "with tempfile.NamedTemporaryFile('w', dir=parent, delete=False) as f:\n    f.write(payload)\n    tmp_name = f.name\nos.replace(tmp_name, target_path)",
+  "created_at": "2026-10-29"
+}

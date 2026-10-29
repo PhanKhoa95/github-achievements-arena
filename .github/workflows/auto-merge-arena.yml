@@ -1,4 +1,4 @@
-name: "🏆 Arena Star-Gate & Instant Auto-Merge Bot"
+name: "🛡️ 5-Gate Moderation & Instant Auto-Merge Bot"
 
 on:
   pull_request_target:
@@ -12,13 +12,13 @@ permissions:
   issues: write
 
 jobs:
-  arena-auto-merge:
+  moderation-and-merge:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/recheck'))
     steps:
-      - name: Evaluate Star Gate & Auto-Merge Safe Contributor PR
+      - name: Run 5-Gate Moderation Audit & Tiered Merge
         uses: actions/github-script@v7
         with:
           script: |
@@ -40,8 +40,9 @@ jobs:
             }
 
             const author = pr.user.login;
+            const authorLower = author.toLowerCase();
 
-            // 1. Verify safe file paths only (HALL_OF_FAME.md or contributors/*.json)
+            // Fetch all changed files in the PR
             const { data: files } = await github.rest.pulls.listFiles({
               owner,
               repo,
@@ -49,22 +50,107 @@ jobs:
               per_page: 100,
             });
 
-            const unsafeFiles = files.filter(f => {
-              const fn = f.filename;
-              return !(fn === 'HALL_OF_FAME.md' || (fn.startsWith('contributors/') && fn.endsWith('.json')));
-            });
+            const gateResults = [];
+            let hardBlocked = false;
+            let requiresMaintainerApproval = false;
 
-            if (unsafeFiles.length > 0) {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: prNumber,
-                body: `⚠️ Hi @${author}! For security reasons, the **10-Second Auto-Merge Bot** only auto-merges Pull Requests that edit \`HALL_OF_FAME.md\` or \`contributors/${author}.json\`. A maintainer will review your changes manually!`,
-              });
-              return;
+            // GATE 1: Ownership & Path Quarantine + Anti-Deletion Check
+            for (const f of files) {
+              const fn = f.filename;
+              if (f.status === 'removed') {
+                hardBlocked = true;
+                gateResults.push(`| ❌ **Gate 1: Anti-Deletion Guard** | \`${fn}\` | Blocked: Deleting existing repository files is not permitted. |`);
+                continue;
+              }
+              if (fn === 'HALL_OF_FAME.md') {
+                if (f.deletions > 0 && authorLower !== owner.toLowerCase()) {
+                  hardBlocked = true;
+                  gateResults.push(`| ❌ **Gate 1: Hall of Fame Integrity** | \`HALL_OF_FAME.md\` | Blocked: PR removes ${f.deletions} existing line(s). Only append your own row! |`);
+                } else {
+                  gateResults.push(`| ✅ **Gate 1: Path & Ownership** | \`HALL_OF_FAME.md\` | Safe append-only update (+${f.additions} lines). |`);
+                }
+              } else if (fn.startsWith('contributors/') && fn.endsWith('.json')) {
+                const expectedPath = `contributors/${authorLower}.json`;
+                if (fn.toLowerCase() !== expectedPath && authorLower !== owner.toLowerCase()) {
+                  hardBlocked = true;
+                  gateResults.push(`| ❌ **Gate 1: Profile Ownership Lock** | \`${fn}\` | Blocked: @${author} can only create/edit \`contributors/${author}.json\`. |`);
+                } else {
+                  gateResults.push(`| ✅ **Gate 1: Profile Ownership Lock** | \`${fn}\` | Verified owner match (@${author}). |`);
+                }
+              } else if (fn.startsWith('lessons/community/') && fn.endsWith('.json')) {
+                const baseName = fn.split('/').pop().toLowerCase();
+                if (!baseName.startsWith(`${authorLower}-`) && authorLower !== owner.toLowerCase()) {
+                  hardBlocked = true;
+                  gateResults.push(`| ❌ **Gate 1: Lesson Ownership Lock** | \`${fn}\` | Blocked: Filename must start with \`lessons/community/${author}-\`. |`);
+                } else {
+                  gateResults.push(`| ✅ **Gate 1: Lesson Ownership Lock** | \`${fn}\` | Verified community lesson path for @${author}. |`);
+                }
+              } else if (fn.startsWith('.github/')) {
+                hardBlocked = true;
+                gateResults.push(`| ❌ **Gate 1: Workflow Security Lock** | \`${fn}\` | Blocked: Modifying \`.github/\` workflows is restricted to repo owner. |`);
+              } else {
+                requiresMaintainerApproval = true;
+                gateResults.push(`| 🟡 **Gate 1: Core Docs / Code Path** | \`${fn}\` | **Tier B (Moderated):** Requires maintainer @${owner} review before merge. |`);
+              }
             }
 
-            // 2. Check if the PR author has Starred this repository
+            // GATE 2 & 3: Schema Validation + DLP / Anti-Spam Content Scan
+            const forbiddenRegexes = [
+              { rx: /gh[pousr]_[A-Za-z0-9_]{20,}/, name: 'Leaked GitHub Token' },
+              { rx: /sk-[A-Za-z0-9]{20,}/, name: 'Leaked API Secret Key' },
+              { rx: /<script\b/i, name: 'HTML <script> Injection' },
+              { rx: /javascript:/i, name: 'javascript: URI Injection' },
+              { rx: /https?:\/\/(?:bit\.ly|tinyurl\.com)\//i, name: 'Disallowed URL Shortener' },
+            ];
+
+            for (const f of files) {
+              const patch = f.patch || '';
+              for (const rule of forbiddenRegexes) {
+                if (rule.rx.test(patch)) {
+                  hardBlocked = true;
+                  gateResults.push(`| ❌ **Gate 3: DLP & Anti-Spam Scan** | \`${f.filename}\` | Blocked: Detected ${rule.name}. |`);
+                }
+              }
+
+              if ((f.filename.startsWith('contributors/') || f.filename.startsWith('lessons/community/')) && f.filename.endsWith('.json')) {
+                try {
+                  const { data: blob } = await github.rest.repos.getContent({
+                    owner: pr.head.repo.owner.login,
+                    repo: pr.head.repo.name,
+                    path: f.filename,
+                    ref: pr.head.sha,
+                  });
+                  const rawText = Buffer.from(blob.content, 'base64').toString('utf8');
+                  const parsed = JSON.parse(rawText);
+
+                  if (f.filename.startsWith('contributors/')) {
+                    if (!parsed.username || String(parsed.username).toLowerCase() !== authorLower) {
+                      hardBlocked = true;
+                      gateResults.push(`| ❌ **Gate 2: JSON Schema** | \`${f.filename}\` | \`username\` field must equal \`"${author}"\`. |`);
+                    } else {
+                      gateResults.push(`| ✅ **Gate 2 & 3: JSON Schema & DLP** | \`${f.filename}\` | Valid contributor JSON schema & clean content. |`);
+                    }
+                  } else if (f.filename.startsWith('lessons/community/')) {
+                    const reqFields = ['id', 'author', 'title', 'category', 'language', 'problem', 'solution'];
+                    const missing = reqFields.filter(k => !parsed[k] || String(parsed[k]).trim().length < 3);
+                    if (missing.length > 0) {
+                      hardBlocked = true;
+                      gateResults.push(`| ❌ **Gate 2: Lesson Schema** | \`${f.filename}\` | Missing required fields: \`${missing.join(', ')}\`. |`);
+                    } else if (String(parsed.problem).length < 15 || String(parsed.solution).length < 15) {
+                      hardBlocked = true;
+                      gateResults.push(`| ❌ **Gate 2: Lesson Quality Gate** | \`${f.filename}\` | \`problem\` and \`solution\` must be >= 15 chars each. |`);
+                    } else {
+                      gateResults.push(`| ✅ **Gate 2 & 3: Lesson Schema & DLP** | \`${f.filename}\` | Valid engineering lesson (\`${parsed.title}\`). |`);
+                    }
+                  }
+                } catch (err) {
+                  hardBlocked = true;
+                  gateResults.push(`| ❌ **Gate 2: JSON Syntax** | \`${f.filename}\` | Invalid JSON syntax: ${err.message} |`);
+                }
+              }
+            }
+
+            // GATE 4: Star Verification
             let hasStarred = false;
             let page = 1;
             while (page <= 10) {
@@ -74,7 +160,7 @@ jobs:
                 per_page: 100,
                 page,
               });
-              if (stargazers.some(u => u.login.toLowerCase() === author.toLowerCase())) {
+              if (stargazers.some(u => u.login.toLowerCase() === authorLower)) {
                 hasStarred = true;
                 break;
               }
@@ -82,44 +168,95 @@ jobs:
               page++;
             }
 
-            if (!hasStarred && author.toLowerCase() !== owner.toLowerCase()) {
+            if (hasStarred || authorLower === owner.toLowerCase()) {
+              gateResults.push(`| ✅ **Gate 4: Star Verification (⭐)** | \`@${author}\` | Confirmed stargazer of \`${owner}/${repo}\`. |`);
+            } else {
+              gateResults.push(`| ⚠️ **Gate 4: Star Verification (⭐)** | \`@${author}\` | Pending: Click **⭐ Star** on this repository to unlock Auto-Merge! |`);
+            }
+
+            // Evaluate Final Verdict
+            if (hardBlocked) {
               await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: prNumber,
                 body: [
-                  `### ⭐ Almost there, @${author}!`,
+                  `## 🛡️ 5-Gate Moderation Verdict: ❌ Changes Requested`,
                   ``,
-                  `Your Pull Request touches safe Arena files (\`${files.map(f => f.filename).join(', ')}\`), so it is eligible for **Instant Auto-Merge**!`,
+                  `Hi @${author}, our automated moderation bot detected an issue with this submission:`,
                   ``,
-                  `👉 **Action Required:**`,
-                  `1. Click the **\`⭐ Star\`** button at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}).`,
-                  `2. Reply here with \`/recheck\` (or wait for our Star-Listener Bot) and I will **Approve & Merge your PR immediately** to unlock your **🦈 Pull Shark** & **👯 Pair Extraordinaire** badges!`
+                  `| Gate | File / Scope | Details |`,
+                  `| :--- | :--- | :--- |`,
+                  ...gateResults,
+                  ``,
+                  `👉 Please fix the item(s) marked with ❌ above and push a new commit (or reply \`/recheck\`).`
                 ].join('\n'),
               });
               return;
             }
 
-            // 3. Approve the PR
+            if (!hasStarred && authorLower !== owner.toLowerCase()) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  `## ⭐ 4/5 Moderation Gates Passed, @${author}!`,
+                  ``,
+                  `| Gate | File / Scope | Details |`,
+                  `| :--- | :--- | :--- |`,
+                  ...gateResults,
+                  ``,
+                  `👉 **Final Step:** Click the **\`⭐ Star\`** button at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}) — our **Star-Listener Bot** will automatically merge your PR the moment you star!`
+                ].join('\n'),
+              });
+              return;
+            }
+
+            if (requiresMaintainerApproval && authorLower !== owner.toLowerCase()) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  labels: ['needs-maintainer-review'],
+                });
+              } catch (e) {}
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  `## 🟡 5-Gate Moderation Verdict: Passed Pre-Flight (Queued for Maintainer Review)`,
+                  ``,
+                  `Thank you @${author}! Because this PR modifies core documentation or code outside \`contributors/\` and \`lessons/community/\`, it has been routed to maintainer **@${owner}** for final editorial review:`,
+                  ``,
+                  `| Gate | File / Scope | Details |`,
+                  `| :--- | :--- | :--- |`,
+                  ...gateResults,
+                ].join('\n'),
+              });
+              return;
+            }
+
+            // TIER A: All 5 Gates Passed -> Auto-Approve & Merge!
             try {
               await github.rest.pulls.createReview({
                 owner,
                 repo,
                 pull_number: prNumber,
                 event: 'APPROVE',
-                body: `✅ **Star Gate Verified (` + '⭐' + `)!** Approved by GitHub Achievements Arena Bot for @${author}.`,
+                body: `✅ **5/5 Moderation Gates Passed!** Approved by GitHub Achievements Arena Bot for @${author}.`,
               });
-            } catch (e) {
-              console.log('Review note:', e.message);
-            }
+            } catch (e) {}
 
-            // 4. Merge the PR with Co-authored-by trailer preserved
             await github.rest.pulls.merge({
               owner,
               repo,
               pull_number: prNumber,
               merge_method: 'merge',
-              commit_title: `feat(arena): merge contributor PR #${prNumber} from @${author}`,
+              commit_title: `feat(arena): merge validated contribution #${prNumber} from @${author}`,
               commit_message: `Co-authored-by: ${author} <${pr.user.id}+${author}@users.noreply.github.com>\nCo-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`,
             });
 
@@ -128,13 +265,15 @@ jobs:
               repo,
               issue_number: prNumber,
               body: [
-                `## 🎉 Boom! Merged in 10 Seconds, @${author}!`,
+                `## 🎉 5/5 Moderation Gates Passed — Auto-Merged in 10 Seconds, @${author}!`,
                 ``,
-                `Your Pull Request #${prNumber} has been **Approved & Merged** into \`main\`!`,
-                `- 🦈 **Pull Shark Progress:** +1 Merged PR! *(Need 2 for Default, 16 for Bronze \`x2\` — feel free to open more PRs updating \`contributors/${author}.json\`!)*`,
+                `| Gate | File / Scope | Details |`,
+                `| :--- | :--- | :--- |`,
+                ...gateResults,
+                ``,
+                `### 🏆 Your Unlocked Progress`,
+                `- 🦈 **Pull Shark:** +1 Merged PR!`,
                 `- 👯 **Pair Extraordinaire:** Co-authored commit trailer recorded on \`main\`!`,
-                `- 🧠 **Want Galaxy Brain too?** Visit our [**Q&A Discussions**](https://github.com/${owner}/${repo}/discussions/categories/q-a) to ask & answer questions!`,
-                ``,
-                `Thank you for starring ⭐ [**${owner}/${repo}**](https://github.com/${owner}/${repo}) — share the Arena with your friends!`
+                `- 📚 **Next Step:** Read our [**25 Battle-Tested Open-Source Lessons (\`docs/REAL_WORLD_OSS_LESSONS.md\`)**](https://github.com/${owner}/${repo}/blob/main/docs/REAL_WORLD_OSS_LESSONS.md) or submit your own lesson in \`lessons/community/${author}-topic.json\`!`
               ].join('\n'),
             });
