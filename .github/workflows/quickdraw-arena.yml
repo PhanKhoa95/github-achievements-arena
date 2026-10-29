@@ -1,4 +1,4 @@
-name: "⚡ Quickdraw Instant Issue Bot"
+name: "⚡ Quickdraw & 1-Click Onboarding Issue Bot"
 
 on:
   issues:
@@ -8,30 +8,60 @@ permissions:
   issues: write
 
 jobs:
-  quickdraw-close:
+  handle-issue:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.title, 'quickdraw')
     steps:
-      - name: Auto-Close Quickdraw Issue Under 5 Minutes
+      - name: Generate 1-Click Deep Links & Auto-Close Quickdraw Issues
         uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const issueNumber = context.payload.issue.number;
-            const author = context.payload.issue.user.login;
+            const issue = context.payload.issue;
+            const issueNumber = issue.number;
+            const author = issue.user.login;
+            const authorId = issue.user.id;
+            const titleLower = (issue.title || '').toLowerCase();
 
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: issueNumber,
-              body: `⚡ **Gitty up, @${author}!** Closing this \`[Quickdraw]\` issue within 15 seconds of opening so you unlock the **⚡ Quickdraw** achievement! Don't forget to **⭐ Star** [**${owner}/${repo}**](https://github.com/${owner}/${repo})!`,
-            });
+            // Do not auto-close maintainer pinned 'good first issue' quests
+            const labels = (issue.labels || []).map(l => (l.name || '').toLowerCase());
+            if (labels.includes('good first issue') || labels.includes('pinned-quest')) {
+              return;
+            }
 
-            await github.rest.issues.update({
-              owner,
-              repo,
-              issue_number: issueNumber,
-              state: 'closed',
-              state_reason: 'completed',
-            });
+            const sampleJson = encodeURIComponent(JSON.stringify({
+              username: author,
+              name: author,
+              target_badges: ["Pull Shark", "Pair Extraordinaire", "Quickdraw", "Galaxy Brain", "YOLO"],
+              arena_prs_count: 1,
+              updated_at: new Date().toISOString().slice(0, 10)
+            }, null, 2) + '\n');
+
+            const oneClickPrUrl = `https://github.com/${owner}/${repo}/new/main?filename=contributors/${author}.json&value=${sampleJson}&message=${encodeURIComponent(`feat(arena): add @${author} profile`)}&description=${encodeURIComponent(`Co-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`)}`;
+
+            if (titleLower.includes('quickdraw') || titleLower.includes('unlock')) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: [
+                  `## ⚡ Welcome to the Arena, @${author}!`,
+                  ``,
+                  `1. **⚡ Quickdraw Unlocked:** I am closing this issue right now (under 15 seconds from opening) so you immediately earn the **⚡ Quickdraw** badge!`,
+                  `2. **⭐ Step 1 — Star the Repo:** Make sure you have clicked **\`⭐ Star\`** at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}).`,
+                  `3. **🦈👯 Step 2 — 1-Click Pull Shark + Pair Extraordinaire:**`,
+                  `   👉 [**Click Here to Auto-Create Your Contributor File & PR in 1 Click!**](${oneClickPrUrl})`,
+                  `   *(Everything is pre-filled for you, including the \`Co-authored-by:\` trailer — just click **Propose changes -> Create pull request** and our bot will merge it in 10 seconds!)*`,
+                  `4. **🧠 Step 3 — Unlock Galaxy Brain:**`,
+                  `   👉 Visit [**Q&A Discussions**](https://github.com/${owner}/${repo}/discussions/categories/q-a) and reply to any open question — our **🧠 Galaxy Brain Bot** will automatically mark your reply as the **Accepted Answer**!`
+                ].join('\n'),
+              });
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }

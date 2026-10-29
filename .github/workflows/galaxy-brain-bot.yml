@@ -1,0 +1,74 @@
+name: "🧠 Galaxy Brain Auto-Accept Discussion Bot"
+
+on:
+  discussion_comment:
+    types: [created]
+
+permissions:
+  discussions: write
+  issues: write
+  contents: read
+
+jobs:
+  auto-accept-answer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Star Gate & Mark Comment as Accepted Answer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const comment = context.payload.comment;
+            const discussion = context.payload.discussion;
+            const commenter = comment.user.login;
+
+            if (commenter.endsWith('[bot]')) return;
+
+            // 1. Check if commenter has Starred this repository
+            let hasStarred = false;
+            let page = 1;
+            while (page <= 10) {
+              const { data: stargazers } = await github.rest.activity.listStargazersForRepo({
+                owner,
+                repo,
+                per_page: 100,
+                page,
+              });
+              if (stargazers.some(u => u.login.toLowerCase() === commenter.toLowerCase())) {
+                hasStarred = true;
+                break;
+              }
+              if (stargazers.length < 100) break;
+              page++;
+            }
+
+            if (!hasStarred && commenter.toLowerCase() !== owner.toLowerCase()) {
+              await github.graphql(`
+                mutation($discId: ID!, $body: String!) {
+                  addDiscussionComment(input: {discussionId: $discId, body: $body}) {
+                    comment { id }
+                  }
+                }
+              `, {
+                discId: discussion.node_id,
+                body: `👋 Hi @${commenter}! To activate the **🧠 Galaxy Brain Auto-Accept Bot**, please click **⭐ Star** at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}) and post another comment!`
+              });
+              return;
+            }
+
+            // 2. Mark this comment as the Accepted Answer via GraphQL
+            try {
+              await github.graphql(`
+                mutation($commentId: ID!) {
+                  markDiscussionCommentAsAnswer(input: {id: $commentId}) {
+                    discussion { id }
+                  }
+                }
+              `, {
+                commentId: comment.node_id,
+              });
+              console.log(`Marked comment by @${commenter} as Accepted Answer!`);
+            } catch (err) {
+              console.log('Could not mark as answer (may already be answered or non-Q&A category):', err.message);
+            }

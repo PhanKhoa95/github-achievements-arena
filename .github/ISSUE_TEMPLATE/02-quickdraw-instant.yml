@@ -1,0 +1,14 @@
+name: "⚡ Instant Quickdraw Badge (Auto-Closes in 15s)"
+description: "Open this issue and our bot will automatically close it within 15 seconds to unlock ⚡ Quickdraw!"
+title: "[Quickdraw] ⚡ Unlock Quickdraw Achievement"
+labels: ["quickdraw"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Just click **Submit new issue** below! Our `quickdraw-arena.yml` bot will close this issue within **15 seconds** so you unlock **⚡ Quickdraw**. Don't forget to **⭐ Star** the repository!
+  - type: input
+    id: note
+    attributes:
+      label: "Say hello to the global community!"
+      value: "Hunting ⚡ Quickdraw in the GitHub Achievements Arena!"

@@ -1,0 +1,29 @@
+name: "🚀 1-Click Unlock All Achievements (No Coding Required)"
+description: "Automatically unlock ⚡ Quickdraw in 15s and get a pre-filled 1-Click link for 🦈 Pull Shark & 👯 Pair Extraordinaire!"
+title: "[Unlock] 🚀 1-Click Achievement Starter Pack"
+labels: ["quickdraw", "starter-pack"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 👋 Welcome to the GitHub Achievements Arena!
+        1. First, click the **⭐ Star** button at the top-right of this repository.
+        2. Click **Submit new issue** below — our **Arena Bot** will reply in **15 seconds** with your **1-Click Pre-Filled Pull Request Link** and automatically close this issue to unlock your **⚡ Quickdraw** badge!
+  - type: checkboxes
+    id: badges
+    attributes:
+      label: "Which badges are you hunting today?"
+      options:
+        - label: "🦈 Pull Shark (Merged Pull Requests)"
+        - label: "👯 Pair Extraordinaire (Co-Authored Pull Requests)"
+        - label: "⚡ Quickdraw (Closed under 5 minutes)"
+        - label: "🧠 Galaxy Brain (Accepted Discussion Answers)"
+        - label: "🚀 YOLO (Merged without review)"
+        - label: "🌟 Starstruck (16+ Stars on your repo)"
+  - type: input
+    id: featured_repo
+    attributes:
+      label: "Your Featured Repository URL (Optional — for Community Star-Back 🤝)"
+      placeholder: "https://github.com/your-username/your-cool-repo"
+    validations:
+      required: false
