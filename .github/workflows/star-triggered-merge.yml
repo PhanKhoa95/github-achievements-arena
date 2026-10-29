@@ -1,0 +1,72 @@
+name: "⭐ Star-Triggered Pending PR Auto-Merger"
+
+on:
+  watch:
+    types: [started]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  merge-on-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if New Stargazer Has an Open Safe PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const stargazer = context.payload.sender.login;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 50,
+            });
+
+            for (const pr of prs) {
+              if (pr.user.login.toLowerCase() !== stargazer.toLowerCase()) continue;
+
+              const { data: files } = await github.rest.pulls.listFiles({
+                owner,
+                repo,
+                pull_number: pr.number,
+                per_page: 100,
+              });
+
+              const unsafe = files.some(f => {
+                const fn = f.filename;
+                return !(fn === 'HALL_OF_FAME.md' || (fn.startsWith('contributors/') && fn.endsWith('.json')));
+              });
+              if (unsafe) continue;
+
+              try {
+                await github.rest.pulls.createReview({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  event: 'APPROVE',
+                  body: `⭐ Thank you for starring the Arena, @${stargazer}! Auto-approving PR #${pr.number}.`,
+                });
+              } catch (e) {}
+
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: pr.number,
+                merge_method: 'merge',
+                commit_title: `feat(arena): merge contributor PR #${pr.number} from @${stargazer}`,
+                commit_message: `Co-authored-by: ${stargazer} <${pr.user.id}+${stargazer}@users.noreply.github.com>\nCo-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`,
+              });
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: `🎉 **Star Detected (⭐)!** Your Pull Request #${pr.number} was automatically merged, @${stargazer}! Enjoy your **🦈 Pull Shark** & **👯 Pair Extraordinaire** progress!`,
+              });
+            }

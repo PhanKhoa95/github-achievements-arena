@@ -1,0 +1,140 @@
+name: "🏆 Arena Star-Gate & Instant Auto-Merge Bot"
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  arena-auto-merge:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/recheck'))
+    steps:
+      - name: Evaluate Star Gate & Auto-Merge Safe Contributor PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request
+              ? context.payload.pull_request.number
+              : context.payload.issue.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.state !== 'open' || pr.merged) {
+              console.log(`PR #${prNumber} is already closed/merged.`);
+              return;
+            }
+
+            const author = pr.user.login;
+
+            // 1. Verify safe file paths only (HALL_OF_FAME.md or contributors/*.json)
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+
+            const unsafeFiles = files.filter(f => {
+              const fn = f.filename;
+              return !(fn === 'HALL_OF_FAME.md' || (fn.startsWith('contributors/') && fn.endsWith('.json')));
+            });
+
+            if (unsafeFiles.length > 0) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `⚠️ Hi @${author}! For security reasons, the **10-Second Auto-Merge Bot** only auto-merges Pull Requests that edit \`HALL_OF_FAME.md\` or \`contributors/${author}.json\`. A maintainer will review your changes manually!`,
+              });
+              return;
+            }
+
+            // 2. Check if the PR author has Starred this repository
+            let hasStarred = false;
+            let page = 1;
+            while (page <= 10) {
+              const { data: stargazers } = await github.rest.activity.listStargazersForRepo({
+                owner,
+                repo,
+                per_page: 100,
+                page,
+              });
+              if (stargazers.some(u => u.login.toLowerCase() === author.toLowerCase())) {
+                hasStarred = true;
+                break;
+              }
+              if (stargazers.length < 100) break;
+              page++;
+            }
+
+            if (!hasStarred && author.toLowerCase() !== owner.toLowerCase()) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  `### ⭐ Almost there, @${author}!`,
+                  ``,
+                  `Your Pull Request touches safe Arena files (\`${files.map(f => f.filename).join(', ')}\`), so it is eligible for **Instant Auto-Merge**!`,
+                  ``,
+                  `👉 **Action Required:**`,
+                  `1. Click the **\`⭐ Star\`** button at the top-right of [**${owner}/${repo}**](https://github.com/${owner}/${repo}).`,
+                  `2. Reply here with \`/recheck\` (or wait for our Star-Listener Bot) and I will **Approve & Merge your PR immediately** to unlock your **🦈 Pull Shark** & **👯 Pair Extraordinaire** badges!`
+                ].join('\n'),
+              });
+              return;
+            }
+
+            // 3. Approve the PR
+            try {
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number: prNumber,
+                event: 'APPROVE',
+                body: `✅ **Star Gate Verified (` + '⭐' + `)!** Approved by GitHub Achievements Arena Bot for @${author}.`,
+              });
+            } catch (e) {
+              console.log('Review note:', e.message);
+            }
+
+            // 4. Merge the PR with Co-authored-by trailer preserved
+            await github.rest.pulls.merge({
+              owner,
+              repo,
+              pull_number: prNumber,
+              merge_method: 'merge',
+              commit_title: `feat(arena): merge contributor PR #${prNumber} from @${author}`,
+              commit_message: `Co-authored-by: ${author} <${pr.user.id}+${author}@users.noreply.github.com>\nCo-authored-by: Khoa Phan <233728558+khoap1220-hue@users.noreply.github.com>`,
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: [
+                `## 🎉 Boom! Merged in 10 Seconds, @${author}!`,
+                ``,
+                `Your Pull Request #${prNumber} has been **Approved & Merged** into \`main\`!`,
+                `- 🦈 **Pull Shark Progress:** +1 Merged PR! *(Need 2 for Default, 16 for Bronze \`x2\` — feel free to open more PRs updating \`contributors/${author}.json\`!)*`,
+                `- 👯 **Pair Extraordinaire:** Co-authored commit trailer recorded on \`main\`!`,
+                `- 🧠 **Want Galaxy Brain too?** Visit our [**Q&A Discussions**](https://github.com/${owner}/${repo}/discussions/categories/q-a) to ask & answer questions!`,
+                ``,
+                `Thank you for starring ⭐ [**${owner}/${repo}**](https://github.com/${owner}/${repo}) — share the Arena with your friends!`
+              ].join('\n'),
+            });
