@@ -10,7 +10,7 @@ permissions:
 jobs:
   quickdraw-close:
     runs-on: ubuntu-latest
-    if: contains( lower(github.event.issue.title), 'quickdraw' )
+    if: contains(github.event.issue.title, 'quickdraw')
     steps:
       - name: Auto-Close Quickdraw Issue Under 5 Minutes
         uses: actions/github-script@v7
